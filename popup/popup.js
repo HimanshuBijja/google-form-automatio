@@ -165,6 +165,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
 
     list.slice(0, 15).forEach(item => {
+      let displayAnswer = item.answer || '(empty)';
+      if (item.answer === '{{RANDOM_TEXT_15}}') displayAnswer = '🎲 Random 15-char (a-zA-Z)';
+      else if (item.answer === '{{MIXED_FULL_NAME}}') displayAnswer = '👤 Mixed Full Name (CSV)';
+      else if (item.answer === '{{AUTO_EMAIL}}') displayAnswer = '📧 Auto Email (name + phone digits)';
+      else if (item.answer === '{{AUTO_PHONE}}') displayAnswer = '📞 Auto Phone (92310xxxxx)';
+
       const div = document.createElement('div');
       div.className = 'pop-field-item';
       div.innerHTML = `
@@ -172,7 +178,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           <span class="pop-field-q">${escapeHtml(item.question)}</span>
           <span class="pop-field-tag">${escapeHtml(item.type)}</span>
         </div>
-        <div class="pop-field-a">${escapeHtml(item.answer || '(empty)')}</div>
+        <div class="pop-field-a">${escapeHtml(displayAnswer)}</div>
       `;
       popFieldsList.appendChild(div);
     });

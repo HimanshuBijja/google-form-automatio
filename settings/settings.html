@@ -14,7 +14,7 @@
         <span class="brand-logo">⚡</span>
         <div>
           <h1>AutoApply - Field Customizer & Settings</h1>
-          <p>Customize your questions, answers, and question types for automatic Google Form filling.</p>
+          <p>Customize your questions, answers, dynamic generators, and CSV name mix-and-match pool.</p>
         </div>
       </div>
       <div class="header-actions">
@@ -28,6 +28,7 @@
     <!-- Main Navigation Tabs -->
     <nav class="nav-bar">
       <button class="nav-btn active" data-tab="tab-fields">📝 Form Fields & Answers (<span id="field-count-badge">0</span>)</button>
+      <button class="nav-btn" data-tab="tab-names">👥 CSV & Name Pool (<span id="pool-count-badge">100 names</span>)</button>
       <button class="nav-btn" data-tab="tab-config">⚙️ Automation & Execution Settings</button>
     </nav>
 
@@ -47,7 +48,7 @@
 
       <!-- Info Banner -->
       <div class="info-banner">
-        💡 <strong>How it works:</strong> AutoApply scans each question in the Google Form. If the question matches your <strong>Question</strong>, it applies the <strong>Type</strong> (types text/email/phone, clicks the matching radio button, or checks the checkbox) using your <strong>Answer</strong>.
+        💡 <strong>Dynamic Generation:</strong> In the <strong>Pre-seeded Answer / Value</strong> column, you can either enter static text OR choose <strong>🎲 Random 15-char Text (a-zA-Z)</strong>, <strong>👤 Mixed Full Name</strong>, <strong>📧 Auto Email</strong>, or <strong>📞 Auto Phone (92310xxxxx)</strong>.
       </div>
 
       <!-- Fields List Container -->
@@ -56,7 +57,74 @@
       </div>
     </main>
 
-    <!-- Tab 2: Automation & Execution Settings -->
+    <!-- Tab 2: Name Pool & CSV Customizer -->
+    <main id="tab-names" class="tab-content">
+      <div class="settings-card">
+        <h2>👥 Name Pool & Sequential Generator Settings</h2>
+        <p class="section-desc">Upload a CSV or edit the First & Last Names below. AutoApply mixes and matches them randomly on each iteration!</p>
+
+        <!-- CSV Uploader Row -->
+        <div class="csv-upload-box">
+          <div class="csv-upload-info">
+            <strong>Upload CSV of Names</strong>
+            <span>Format: <code>First Name, Last Name</code> (header row optional, comma separated)</span>
+          </div>
+          <div>
+            <button id="btn-upload-csv" class="btn btn-accent">📂 Select CSV File</button>
+            <input type="file" id="file-csv-input" accept=".csv,.txt" style="display:none;" />
+          </div>
+        </div>
+
+        <!-- Phone & Email Generation Parameters -->
+        <div class="grid-2-col" style="margin-top: 18px; margin-bottom: 20px;">
+          <div class="param-box">
+            <label class="field-label">Phone Prefix</label>
+            <input type="text" id="cfg-phone-prefix" value="92310" class="field-input" placeholder="92310" />
+            <span class="hint">Prefix preceding the 5-digit counter.</span>
+          </div>
+          <div class="param-box">
+            <label class="field-label">Current Phone Counter (01234 - 99999)</label>
+            <div style="display:flex; gap:8px;">
+              <input type="number" id="cfg-phone-counter" min="0" max="99999" value="1234" class="field-input" />
+              <button id="btn-reset-counter" class="btn btn-secondary" title="Reset counter to 01234">Reset</button>
+            </div>
+            <span class="hint">Iterates from 01234 to 99999 (+1 each submission).</span>
+          </div>
+        </div>
+
+        <div class="param-box" style="margin-bottom: 20px;">
+          <label class="field-label">Auto-Generated Email Formula</label>
+          <div class="formula-preview">
+            <code>[FirstName][LastName][PhoneLast5Digits]@gmail.com</code> &rarr; e.g. <span id="sample-email-preview" class="sample-pill">johndoe01234@gmail.com</span>
+          </div>
+        </div>
+
+        <!-- Split Textareas for First Names and Last Names -->
+        <div class="grid-2-col">
+          <div class="name-column">
+            <div class="name-col-header">
+              <h3>First Names (<span id="first-names-count">100</span>)</h3>
+              <button id="btn-shuffle-first" class="btn-tiny" title="Shuffle list">🔀 Shuffle</button>
+            </div>
+            <textarea id="textarea-first-names" rows="14" class="names-textarea" placeholder="One name per line..."></textarea>
+          </div>
+
+          <div class="name-column">
+            <div class="name-col-header">
+              <h3>Last Names (<span id="last-names-count">100</span>)</h3>
+              <button id="btn-shuffle-last" class="btn-tiny" title="Shuffle list">🔀 Shuffle</button>
+            </div>
+            <textarea id="textarea-last-names" rows="14" class="names-textarea" placeholder="One name per line..."></textarea>
+          </div>
+        </div>
+
+        <div class="card-footer" style="margin-top: 20px;">
+          <button id="btn-save-pool" class="btn btn-primary">💾 Save Name Pool & Generator</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Tab 3: Automation & Execution Settings -->
     <main id="tab-config" class="tab-content">
       <div class="settings-card">
         <h2>⏱️ Speed & Tab Execution Controls</h2>

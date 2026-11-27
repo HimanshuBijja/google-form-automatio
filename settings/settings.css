@@ -30,7 +30,7 @@ body {
 }
 
 .dashboard-layout {
-  max-width: 1200px;
+  max-width: 1250px;
   margin: 0 auto;
 }
 
@@ -175,7 +175,7 @@ body {
 
 .field-card {
   display: grid;
-  grid-template-columns: 40px 1fr 210px 1.2fr 48px;
+  grid-template-columns: 40px 1fr 190px 1.4fr 48px;
   gap: 14px;
   align-items: center;
   background: var(--bg-card);
@@ -188,10 +188,6 @@ body {
 .field-card:hover {
   border-color: rgba(59, 130, 246, 0.5);
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-}
-
-.field-card.disabled {
-  opacity: 0.5;
 }
 
 .field-num {
@@ -237,6 +233,45 @@ body {
   cursor: pointer;
 }
 
+/* Answer Value Controls */
+.answer-box-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.answer-mode-row {
+  display: flex;
+  gap: 8px;
+}
+
+.answer-mode-select {
+  background: #1e293b;
+  color: #60a5fa;
+  border: 1px solid #3b82f6;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  flex: 0 0 160px;
+}
+
+.token-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  width: 100%;
+}
+
 .btn-delete {
   background: transparent;
   color: var(--danger);
@@ -253,6 +288,121 @@ body {
   border-color: var(--danger);
 }
 
+/* Name Pool Tab Styles */
+.section-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+
+.csv-upload-box {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(16, 185, 129, 0.08);
+  border: 1px dashed rgba(16, 185, 129, 0.4);
+  border-radius: var(--radius);
+  padding: 16px 20px;
+  margin-bottom: 16px;
+}
+
+.csv-upload-info strong {
+  display: block;
+  font-size: 14px;
+  color: #34d399;
+  margin-bottom: 4px;
+}
+
+.csv-upload-info span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.grid-2-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.param-box {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.param-box .hint {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+  display: block;
+}
+
+.formula-preview {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sample-pill {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.name-column {
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+
+.name-col-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.name-col-header h3 {
+  font-size: 14px;
+  color: var(--text-main);
+}
+
+.btn-tiny {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.btn-tiny:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+
+.names-textarea {
+  width: 100%;
+  background: #090d16;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px;
+  color: var(--text-main);
+  font-size: 12px;
+  font-family: monospace;
+  line-height: 1.5;
+  resize: vertical;
+}
+
 /* Config Card */
 .settings-card {
   background: var(--bg-card);
@@ -265,9 +415,7 @@ body {
   font-size: 17px;
   font-weight: 700;
   color: #60a5fa;
-  margin-bottom: 20px;
-  border-bottom: 1px solid var(--border);
-  padding-bottom: 12px;
+  margin-bottom: 6px;
 }
 
 .setting-row {

@@ -1,4 +1,4 @@
-// AutoApply - Enhanced Content Script Form Filler with Custom Fields Engine
+// AutoApply - Enhanced Content Script Form Filler with Dynamic Generators & CSV Mix-and-Match
 (function () {
   let isAutomationActive = false;
   let currentTask = null;
@@ -6,9 +6,10 @@
   let profileData = null;
   let settings = null;
   let hudElement = null;
+  let currentIdentity = null;
 
   // Initialize and check if automation task is active
-  chrome.storage.local.get(['task', 'customFields', 'profile', 'settings'], (res) => {
+  chrome.storage.local.get(['task', 'customFields', 'profile', 'settings', 'generatorSettings'], (res) => {
     customFields = res.customFields || [];
     profileData = res.profile || {};
     settings = res.settings || getDefaultSettings();
@@ -37,6 +38,103 @@
 
   function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  // --- RANDOM & DYNAMIC GENERATION HELPERS ---
+
+  function generateRandomAlpha(length = 15) {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
+  async function prepareIterationIdentity() {
+    const data = await chrome.storage.local.get('generatorSettings');
+    const gen = data.generatorSettings || getDefaultGeneratorSettings();
+
+    // 1. Pick First Name & Last Name from pool
+    const firstPool = (gen.firstNamesPool && gen.firstNamesPool.length > 0) ? gen.firstNamesPool : ['Alex', 'John', 'Michael', 'Sarah'];
+    const lastPool = (gen.lastNamesPool && gen.lastNamesPool.length > 0) ? gen.lastNamesPool : ['Morgan', 'Doe', 'Smith', 'Johnson'];
+
+    const firstName = firstPool[Math.floor(Math.random() * firstPool.length)];
+    const lastName = lastPool[Math.floor(Math.random() * lastPool.length)];
+    const fullName = `${firstName} ${lastName}`;
+
+    // 2. Sequential Phone: prefix (92310) + 5 digits (01234 - 99999)
+    let counter = parseInt(gen.phoneCounter, 10);
+    if (isNaN(counter) || counter < 0) counter = 1234;
+    if (counter > 99999) counter = 1234;
+
+    const last5 = String(counter).padStart(5, '0');
+    const prefix = gen.phonePrefix || '92310';
+    const phone = prefix + last5;
+
+    // 3. Email: firstname + lastname + last 5 digits of phone + domain
+    const cleanFirst = firstName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanLast = lastName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const domain = gen.emailDomain || '@gmail.com';
+    const email = `${cleanFirst}${cleanLast}${last5}${domain}`;
+
+    // 4. Increment counter for next iteration
+    gen.phoneCounter = (counter + 1 > 99999) ? 1234 : counter + 1;
+    await chrome.storage.local.set({ generatorSettings: gen });
+
+    currentIdentity = {
+      firstName,
+      lastName,
+      fullName,
+      phone,
+      last5,
+      email
+    };
+
+    console.log('[AutoApply] Iteration Identity:', currentIdentity);
+    return currentIdentity;
+  }
+
+  function resolveFieldValue(field) {
+    if (!field) return '';
+    const mode = field.answerMode;
+    const rawAnswer = field.answer || '';
+
+    if (mode === 'dynamic_random_15' || rawAnswer === '{{RANDOM_TEXT_15}}') {
+      return generateRandomAlpha(15);
+    }
+    if (mode === 'dynamic_fullname' || rawAnswer === '{{MIXED_FULL_NAME}}') {
+      return currentIdentity ? currentIdentity.fullName : 'Alex Morgan';
+    }
+    if (mode === 'dynamic_firstname' || rawAnswer === '{{FIRST_NAME}}') {
+      return currentIdentity ? currentIdentity.firstName : 'Alex';
+    }
+    if (mode === 'dynamic_lastname' || rawAnswer === '{{LAST_NAME}}') {
+      return currentIdentity ? currentIdentity.lastName : 'Morgan';
+    }
+    if (mode === 'dynamic_email' || rawAnswer === '{{AUTO_EMAIL}}') {
+      return currentIdentity ? currentIdentity.email : 'alexmorgan01234@gmail.com';
+    }
+    if (mode === 'dynamic_phone' || rawAnswer === '{{AUTO_PHONE}}') {
+      return currentIdentity ? currentIdentity.phone : '9231001234';
+    }
+
+    // Support token replacement in custom strings
+    let resolved = rawAnswer;
+    if (resolved.includes('{{RANDOM_TEXT_15}}')) {
+      resolved = resolved.replace(/{{RANDOM_TEXT_15}}/g, generateRandomAlpha(15));
+    }
+    if (resolved.includes('{{MIXED_FULL_NAME}}')) {
+      resolved = resolved.replace(/{{MIXED_FULL_NAME}}/g, currentIdentity ? currentIdentity.fullName : '');
+    }
+    if (resolved.includes('{{AUTO_EMAIL}}')) {
+      resolved = resolved.replace(/{{AUTO_EMAIL}}/g, currentIdentity ? currentIdentity.email : '');
+    }
+    if (resolved.includes('{{AUTO_PHONE}}')) {
+      resolved = resolved.replace(/{{AUTO_PHONE}}/g, currentIdentity ? currentIdentity.phone : '');
+    }
+
+    return resolved;
   }
 
   // --- FLOATING HUD OVERLAY ---
@@ -91,25 +189,29 @@
     if (isAutomationActive) return;
     isAutomationActive = true;
 
-    // Refresh custom fields from storage in case user edited them in full-screen settings
-    const stored = await chrome.storage.local.get(['customFields', 'settings', 'profile']);
+    // Refresh custom fields and settings from storage
+    const stored = await chrome.storage.local.get(['customFields', 'settings', 'profile', 'generatorSettings']);
     if (stored.customFields && stored.customFields.length > 0) {
       customFields = stored.customFields;
     }
     if (stored.settings) settings = stored.settings;
     if (stored.profile) profileData = stored.profile;
 
-    createHUD();
-    updateHUDStatus('Analyzing form fields...', 10);
-    await sleep(600);
-
     // Check if we are already on a Google Forms submission confirmation page
     if (isGoogleFormSubmittedPage()) {
-      updateHUDStatus('Form already submitted! Reporting success...', 100);
-      await sleep(1000);
+      createHUD();
+      updateHUDStatus('Form submitted! Opening next tab...', 100);
+      await sleep(800);
       notifySubmitted();
       return;
     }
+
+    // Generate dynamic iteration identity (name from pool, phone 92310..., email with last 5 digits)
+    await prepareIterationIdentity();
+
+    createHUD();
+    updateHUDStatus(`Applying as: ${currentIdentity.fullName}`, 10);
+    await sleep(600);
 
     try {
       const isGoogleForm = window.location.hostname.includes('docs.google.com') && window.location.pathname.includes('/forms/');
@@ -162,13 +264,13 @@
 
   async function fillGoogleForm() {
     updateHUDStatus('Scanning Google Form questions...', 20);
-    await sleep(500);
+    await sleep(400);
 
-    // Check for top-level email record input (Google Form "Record email as included with my response")
+    // Check for top-level email record input
     const topEmailInput = document.querySelector('input[type="email"].whsOnd, input[type="email"]');
     if (topEmailInput && (!topEmailInput.value || topEmailInput.value.trim() === '')) {
       const emailField = customFields.find(f => f.type === 'email' || f.question.toLowerCase().includes('email'));
-      const emailVal = emailField ? emailField.answer : (profileData ? profileData.email : '');
+      const emailVal = emailField ? resolveFieldValue(emailField) : (currentIdentity ? currentIdentity.email : '');
       if (emailVal) {
         topEmailInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
         await typeIntoInput(topEmailInput, emailVal);
@@ -202,12 +304,12 @@
       // Highlight current question container
       q.scrollIntoView({ behavior: 'smooth', block: 'center' });
       q.classList.add('autoapply-highlight-active');
-      updateHUDStatus(`Question: "${truncate(questionText, 32)}"`, Math.round((i / total) * 75) + 15);
+      updateHUDStatus(`Filling: "${truncate(questionText, 32)}"`, Math.round((i / total) * 75) + 15);
       await sleep(settings ? settings.fieldPauseMs || 300 : 300);
 
       // Check user-configured custom fields first
       const matchedField = findCustomFieldForQuestion(questionText);
-      const answerValue = matchedField ? matchedField.answer : matchFallbackProfileValue(questionText);
+      const answerValue = matchedField ? resolveFieldValue(matchedField) : matchFallbackProfileValue(questionText);
       const fieldType = matchedField ? matchedField.type : 'auto';
 
       let fieldHandled = false;
@@ -266,7 +368,7 @@
     }
 
     updateHUDStatus(`Filled ${filledCount} fields. Preparing to submit...`, 90);
-    await sleep(settings ? settings.submitDelayMs || 1000 : 1000);
+    await sleep(settings ? settings.submitDelayMs || 800 : 800);
 
     // Multi-page "Next" or Final "Submit"
     await handleGoogleFormSubmission();
@@ -279,7 +381,7 @@
 
     // 1. Exact match on question
     for (let f of customFields) {
-      if (!f.question || !f.answer) continue;
+      if (!f.question) continue;
       const fLower = f.question.toLowerCase().trim();
       if (qLower === fLower) {
         return f;
@@ -288,7 +390,7 @@
 
     // 2. Keyword / Substring match
     for (let f of customFields) {
-      if (!f.question || !f.answer) continue;
+      if (!f.question) continue;
       const fLower = f.question.toLowerCase().trim();
       if (qLower.includes(fLower) || fLower.includes(qLower)) {
         return f;
@@ -513,7 +615,7 @@
       const el = visibleInputs[i];
       const labelText = getFieldLabel(el);
       const matchedField = findCustomFieldForQuestion(labelText);
-      const answerValue = matchedField ? matchedField.answer : matchFallbackProfileValue(labelText);
+      const answerValue = matchedField ? resolveFieldValue(matchedField) : matchFallbackProfileValue(labelText);
 
       if (answerValue) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -540,7 +642,7 @@
     }
 
     updateHUDStatus(`Filled ${filledCount} fields. Submitting...`, 90);
-    await sleep(settings ? settings.submitDelayMs || 1000 : 1000);
+    await sleep(settings ? settings.submitDelayMs || 800 : 800);
 
     if (settings && settings.autoSubmit === false) {
       updateHUDStatus('Form filled! Auto-submit paused for review.', 100);
@@ -555,9 +657,9 @@
 
     if (submitBtn) {
       submitBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      await sleep(600);
+      await sleep(500);
       submitBtn.click();
-      await sleep(1500);
+      await sleep(600);
       notifySubmitted();
     }
   }
@@ -641,15 +743,15 @@
   }
 
   function matchFallbackProfileValue(questionText) {
-    if (!profileData || !questionText) return '';
     const q = questionText.toLowerCase().trim();
 
-    if (q.includes('email') || q.includes('e-mail')) return profileData.email || '';
-    if (isPhoneQuestion(q)) return profileData.phone || '';
-    if (q.includes('name')) return profileData.fullName || '';
-    if (q.includes('resume') || q.includes('cv')) return profileData.resumeLink || '';
-    if (q.includes('linkedin')) return profileData.linkedin || '';
-    if (q.includes('github')) return profileData.github || '';
+    if (q.includes('email') || q.includes('e-mail')) return currentIdentity ? currentIdentity.email : (profileData?.email || '');
+    if (isPhoneQuestion(q)) return currentIdentity ? currentIdentity.phone : (profileData?.phone || '');
+    if (q.includes('first name')) return currentIdentity ? currentIdentity.firstName : 'Alex';
+    if (q.includes('last name')) return currentIdentity ? currentIdentity.lastName : 'Morgan';
+    if (q.includes('name')) return currentIdentity ? currentIdentity.fullName : 'Alex Morgan';
+    if (q.includes('resume') || q.includes('cv')) return profileData?.resumeLink || 'https://drive.google.com';
+    if (q.includes('linkedin')) return profileData?.linkedin || 'https://linkedin.com';
 
     return '';
   }
@@ -664,14 +766,25 @@
     return str.length > len ? str.substring(0, len) + '...' : str;
   }
 
+  function getDefaultGeneratorSettings() {
+    return {
+      phonePrefix: '92310',
+      phoneCounter: 1234,
+      emailDomain: '@gmail.com',
+      randomTextLength: 15,
+      firstNamesPool: ['Alex', 'John', 'Michael', 'Sarah', 'David', 'James', 'Emily', 'Daniel', 'Matthew', 'Jessica'],
+      lastNamesPool: ['Morgan', 'Doe', 'Smith', 'Johnson', 'Brown', 'Williams', 'Miller', 'Davis', 'Wilson', 'Taylor']
+    };
+  }
+
   function getDefaultSettings() {
     return {
       typingDelayMs: 25,
       fieldPauseMs: 350,
       autoSubmit: true,
-      submitDelayMs: 1200,
+      submitDelayMs: 800,
       closePreviousTab: true,
-      nextTabDelayMs: 2000
+      nextTabDelayMs: 1500
     };
   }
 })();
