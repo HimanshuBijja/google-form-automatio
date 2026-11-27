@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AutoApply - Field Customizer & Settings</title>
+  <link rel="stylesheet" href="settings.css">
+</head>
+<body>
+  <div class="dashboard-layout">
+    <!-- Top Header -->
+    <header class="dashboard-header">
+      <div class="brand-group">
+        <span class="brand-logo">⚡</span>
+        <div>
+          <h1>AutoApply - Field Customizer & Settings</h1>
+          <p>Customize your questions, answers, and question types for automatic Google Form filling.</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-export-json" class="btn btn-secondary" title="Export all fields to JSON file">📥 Export JSON</button>
+        <button id="btn-import-json" class="btn btn-secondary" title="Import fields from JSON file">📤 Import JSON</button>
+        <input type="file" id="file-import-input" accept=".json" style="display:none;" />
+        <button id="btn-save-all" class="btn btn-primary">💾 Save All Changes</button>
+      </div>
+    </header>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="nav-bar">
+      <button class="nav-btn active" data-tab="tab-fields">📝 Form Fields & Answers (<span id="field-count-badge">0</span>)</button>
+      <button class="nav-btn" data-tab="tab-config">⚙️ Automation & Execution Settings</button>
+    </nav>
+
+    <!-- Tab 1: Form Fields & Answers -->
+    <main id="tab-fields" class="tab-content active">
+      <!-- Toolbar -->
+      <div class="toolbar-card">
+        <div class="search-box">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="input-search" placeholder="Search questions or answers..." />
+        </div>
+        <div class="toolbar-buttons">
+          <button id="btn-load-defaults" class="btn btn-secondary">✨ Load Job Defaults</button>
+          <button id="btn-add-field" class="btn btn-accent">+ Add New Question</button>
+        </div>
+      </div>
+
+      <!-- Info Banner -->
+      <div class="info-banner">
+        💡 <strong>How it works:</strong> AutoApply scans each question in the Google Form. If the question matches your <strong>Question</strong>, it applies the <strong>Type</strong> (types text/email/phone, clicks the matching radio button, or checks the checkbox) using your <strong>Answer</strong>.
+      </div>
+
+      <!-- Fields List Container -->
+      <div id="fields-container" class="fields-list">
+        <!-- Dynamic field rows rendered by settings.js -->
+      </div>
+    </main>
+
+    <!-- Tab 2: Automation & Execution Settings -->
+    <main id="tab-config" class="tab-content">
+      <div class="settings-card">
+        <h2>⏱️ Speed & Tab Execution Controls</h2>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Auto-Submit Form</span>
+            <span class="setting-help">Automatically clicks the Submit button once all fields are filled. Turn off if you want to inspect fields before submitting.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="cfg-autoSubmit" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Close Previous Tab on New Iteration</span>
+            <span class="setting-help">Closes the submitted form tab before launching the next iteration tab to keep your browser clean.</span>
+          </div>
+          <label class="switch">
+            <input type="checkbox" id="cfg-closePrev" checked>
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Typing Delay (Visual Effect)</span>
+            <span class="setting-help">Speed of typing into fields. Set to 0ms for instant filling, or 25-40ms for human-like visible typing.</span>
+          </div>
+          <div class="setting-control">
+            <input type="range" id="cfg-typingDelay" min="0" max="60" value="25" />
+            <span id="cfg-typingDelay-val" class="value-tag">25 ms</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Pause Between Questions (Milliseconds)</span>
+            <span class="setting-help">Delay between scrolling and filling each question so you can comfortably watch the progress.</span>
+          </div>
+          <div class="setting-control">
+            <input type="number" id="cfg-fieldPause" min="100" max="2000" step="50" value="350" class="num-input" />
+            <span class="unit-tag">ms</span>
+          </div>
+        </div>
+
+        <div class="setting-row">
+          <div class="setting-info">
+            <span class="setting-label">Wait Before Next Tab (Seconds)</span>
+            <span class="setting-help">How long to stay on the submission confirmation page before launching the next iteration tab.</span>
+          </div>
+          <div class="setting-control">
+            <input type="number" id="cfg-nextTabDelay" min="1" max="15" value="2" class="num-input" />
+            <span class="unit-tag">sec</span>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <button id="btn-save-config" class="btn btn-primary">💾 Save Settings</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Floating Toast Notification -->
+    <div id="toast" class="toast">Changes saved successfully!</div>
+  </div>
+
+  <script src="settings.js"></script>
+</body>
+</html>

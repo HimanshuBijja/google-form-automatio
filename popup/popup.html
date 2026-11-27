@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AutoApply - Job Form AutoFiller</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand">
+        <span class="brand-icon">⚡</span>
+        <div>
+          <h1 class="brand-title">AutoApply</h1>
+          <p class="brand-sub">Form AutoFiller & Submitter</p>
+        </div>
+      </div>
+      <button id="btn-open-fullscreen" class="icon-btn" title="Open Full-Screen Settings & Custom Fields">⚙️ Full Screen</button>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="tab-run">🚀 Run</button>
+      <button class="nav-tab" data-tab="tab-fields">📝 Fields (<span id="pop-field-count">0</span>)</button>
+      <button class="nav-tab" data-tab="tab-settings">⚙️ Settings</button>
+    </nav>
+
+    <!-- Tab 1: Run Automation -->
+    <main id="tab-run" class="tab-pane active">
+      <div class="card">
+        <label for="input-url" class="field-label">Target Form URL</label>
+        <div class="input-with-btn">
+          <input type="url" id="input-url" placeholder="https://docs.google.com/forms/d/e/.../viewform" />
+          <button id="btn-use-current" class="secondary-btn" title="Paste current browser tab URL">Paste Current</button>
+        </div>
+        <p class="hint">Works with Google Forms, Typeform, and job portals.</p>
+      </div>
+
+      <div class="card">
+        <div class="grid-2">
+          <div>
+            <label for="input-iterations" class="field-label">How Many Times?</label>
+            <input type="number" id="input-iterations" min="1" max="500" value="1" />
+          </div>
+          <div>
+            <label class="field-label">Status</label>
+            <div class="status-pill status-ready" id="status-mode">Ready</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Progress Display -->
+      <div id="progress-box" class="card progress-card hidden">
+        <div class="progress-header">
+          <span class="progress-title">Automation In Progress</span>
+          <span id="progress-iter" class="badge">Iter 1 of 1</span>
+        </div>
+        <div class="progress-track">
+          <div id="progress-bar" class="progress-fill"></div>
+        </div>
+        <p id="progress-status-msg" class="progress-status">Initializing browser tab...</p>
+      </div>
+
+      <!-- Main Action Buttons -->
+      <div class="actions">
+        <button id="btn-start" class="primary-btn">▶ Start Auto-Filling</button>
+        <button id="btn-stop" class="danger-btn hidden">⏹ Stop Automation</button>
+      </div>
+    </main>
+
+    <!-- Tab 2: Custom Fields Summary & Full Screen Launcher -->
+    <main id="tab-fields" class="tab-pane">
+      <div class="fullscreen-banner-card">
+        <div class="banner-title">✨ Full-Screen Question & Answer Customizer</div>
+        <p class="banner-desc">Customize all questions, answers, and pick question types (Radio, Checkbox, Text, Dropdown) in a wide dashboard.</p>
+        <button id="btn-launch-fullscreen" class="accent-btn">🚀 Open Full-Screen Settings Dashboard ↗</button>
+      </div>
+
+      <div class="field-label" style="margin-top: 10px;">Quick Preview of Active Fields:</div>
+      <div class="scroll-area" id="pop-fields-list">
+        <!-- Rendered by popup.js -->
+      </div>
+    </main>
+
+    <!-- Tab 3: Execution Settings -->
+    <main id="tab-settings" class="tab-pane">
+      <div class="scroll-area">
+        <div class="setting-item">
+          <div>
+            <div class="setting-title">Auto-Submit Form</div>
+            <div class="setting-desc">Automatically clicks Submit after filling all questions.</div>
+          </div>
+          <input type="checkbox" id="set-autoSubmit" checked />
+        </div>
+
+        <div class="setting-item">
+          <div>
+            <div class="setting-title">Close Previous Tab</div>
+            <div class="setting-desc">Closes submitted tab before opening next iteration.</div>
+          </div>
+          <input type="checkbox" id="set-closePrev" checked />
+        </div>
+
+        <div class="form-group" style="margin-top: 10px;">
+          <label>Typing Speed / Delay (ms)</label>
+          <input type="range" id="set-typingDelay" min="0" max="60" value="25" />
+          <div class="range-labels">
+            <span>Fast (0ms)</span>
+            <span id="label-typingDelay">25ms (Visual)</span>
+            <span>Slow (60ms)</span>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Pause After Submit Before Next Tab (Seconds)</label>
+          <input type="number" id="set-nextTabDelay" min="1" max="10" value="2" />
+        </div>
+      </div>
+      <div class="actions">
+        <button id="btn-save-settings" class="primary-btn">💾 Save Settings</button>
+      </div>
+    </main>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

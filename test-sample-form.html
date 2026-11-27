@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Sample Job Application Form (Test Page)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f0f2f5;
+      color: #1c1e21;
+      padding: 40px 20px;
+    }
+    .form-container {
+      max-width: 640px;
+      margin: 0 auto;
+      background: #fff;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      color: #1a73e8;
+    }
+    p {
+      color: #5f6368;
+      margin-bottom: 24px;
+      font-size: 14px;
+    }
+    .field-group {
+      margin-bottom: 20px;
+      padding: 14px;
+      border: 1px solid #dadce0;
+      border-radius: 8px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      font-size: 14px;
+      margin-bottom: 8px;
+    }
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="url"],
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px 12px;
+      border: 1px solid #dadce0;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+    .choice-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 6px;
+    }
+    .choice-group label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: normal;
+      cursor: pointer;
+    }
+    button[type="submit"] {
+      background: #1a73e8;
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button[type="submit"]:hover {
+      background: #1557b0;
+    }
+    #confirmation {
+      display: none;
+      text-align: center;
+      padding: 40px 20px;
+    }
+    #confirmation h2 {
+      color: #1e8e3e;
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="form-container">
+    <div id="form-body">
+      <h1>Software Engineer Application Form</h1>
+      <p>Test page to verify AutoApply form filling, radio buttons, checkboxes, email, phone, and submission.</p>
+
+      <form id="job-app-form">
+        <!-- Text Inputs -->
+        <div class="field-group">
+          <label for="fullname">Full Name *</label>
+          <input type="text" id="fullname" name="fullname" required placeholder="Your full name" />
+        </div>
+
+        <!-- Email -->
+        <div class="field-group">
+          <label for="email">Email Address *</label>
+          <input type="email" id="email" name="email" required placeholder="your.email@example.com" />
+        </div>
+
+        <!-- Phone Number -->
+        <div class="field-group">
+          <label for="phone">Phone / Mobile Number *</label>
+          <input type="tel" id="phone" name="phone" required placeholder="+1 555-0199" />
+        </div>
+
+        <!-- Resume Link -->
+        <div class="field-group">
+          <label for="resume">Resume / CV Drive Link *</label>
+          <input type="url" id="resume" name="resume" required placeholder="https://drive.google.com/..." />
+        </div>
+
+        <div class="field-group">
+          <label for="linkedin">LinkedIn Profile URL</label>
+          <input type="url" id="linkedin" name="linkedin" placeholder="https://linkedin.com/in/..." />
+        </div>
+
+        <div class="field-group">
+          <label for="experience">Years of Experience</label>
+          <input type="text" id="experience" name="experience" placeholder="e.g. 4" />
+        </div>
+
+        <!-- Radio Buttons -->
+        <div class="field-group">
+          <label>Are you legally authorized to work in this country?</label>
+          <div class="choice-group">
+            <label><input type="radio" name="authorized" value="Yes" /> Yes</label>
+            <label><input type="radio" name="authorized" value="No" /> No</label>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>Will you now or in the future require visa sponsorship?</label>
+          <div class="choice-group">
+            <label><input type="radio" name="sponsorship" value="Yes" /> Yes</label>
+            <label><input type="radio" name="sponsorship" value="No" /> No</label>
+          </div>
+        </div>
+
+        <!-- Checkboxes -->
+        <div class="field-group">
+          <label>Which core skills and technologies do you know? (Check all that apply)</label>
+          <div class="choice-group">
+            <label><input type="checkbox" name="skills" value="JavaScript" /> JavaScript</label>
+            <label><input type="checkbox" name="skills" value="React" /> React</label>
+            <label><input type="checkbox" name="skills" value="Node.js" /> Node.js</label>
+            <label><input type="checkbox" name="skills" value="Python" /> Python</label>
+            <label><input type="checkbox" name="skills" value="Docker" /> Docker</label>
+          </div>
+        </div>
+
+        <!-- Agreement Checkbox -->
+        <div class="field-group">
+          <label class="choice-group">
+            <input type="checkbox" name="declaration" id="declaration" required />
+            <span>I confirm that all information provided in this application is accurate and truthful.</span>
+          </label>
+        </div>
+
+        <button type="submit" id="submit-btn">Submit Application</button>
+      </form>
+    </div>
+
+    <div id="confirmation">
+      <h2>Your response has been recorded.</h2>
+      <p>Thank you for submitting your application! We will review your profile shortly.</p>
+      <a href="#" onclick="location.reload(); return false;">Submit another response</a>
+    </div>
+  </div>
+
+  <script>
+    document.getElementById('job-app-form').addEventListener('submit', function(e) {
+      e.preventDefault();
+      document.getElementById('form-body').style.display = 'none';
+      document.getElementById('confirmation').style.display = 'block';
+    });
+  </script>
+</body>
+</html>
