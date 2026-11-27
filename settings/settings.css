@@ -30,7 +30,7 @@ body {
 }
 
 .dashboard-layout {
-  max-width: 1250px;
+  max-width: 1280px;
   margin: 0 auto;
 }
 
@@ -175,7 +175,7 @@ body {
 
 .field-card {
   display: grid;
-  grid-template-columns: 40px 1fr 190px 1.4fr 48px;
+  grid-template-columns: 35px 1fr 180px 1.5fr 44px;
   gap: 14px;
   align-items: center;
   background: var(--bg-card);
@@ -243,6 +243,7 @@ body {
 .answer-mode-row {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .answer-mode-select {
@@ -250,26 +251,25 @@ body {
   color: #60a5fa;
   border: 1px solid #3b82f6;
   border-radius: 6px;
-  padding: 6px 10px;
+  padding: 7px 10px;
   font-size: 12px;
   font-weight: 600;
   outline: none;
   cursor: pointer;
-  flex: 0 0 160px;
+  flex: 0 0 170px;
 }
 
-.token-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  background: rgba(16, 185, 129, 0.15);
+.csv-col-select {
+  background: #1e293b;
   color: #34d399;
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  padding: 8px 12px;
+  border: 1px solid #10b981;
   border-radius: 6px;
+  padding: 7px 10px;
   font-size: 12px;
   font-weight: 600;
-  width: 100%;
+  outline: none;
+  cursor: pointer;
+  flex: 1;
 }
 
 .btn-delete {
@@ -288,11 +288,71 @@ body {
   border-color: var(--danger);
 }
 
-/* Name Pool Tab Styles */
+/* CSV Dataset Tab Styles */
 .section-desc {
   font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 16px;
+}
+
+.status-metric-card {
+  background: #090d16;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.status-metric-card.active-metric {
+  border-color: rgba(16, 185, 129, 0.4);
+  background: rgba(16, 185, 129, 0.06);
+}
+
+.metric-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+}
+
+.metric-value-muted {
+  font-size: 15px;
+  font-weight: 700;
+  color: #94a3b8;
+}
+
+.metric-value-active {
+  font-size: 18px;
+  font-weight: 800;
+  color: #34d399;
+}
+
+.jump-row-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: #090d16;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-top: 10px;
+}
+
+.jump-input-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.jump-quick-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .csv-upload-box {
@@ -302,13 +362,13 @@ body {
   background: rgba(16, 185, 129, 0.08);
   border: 1px dashed rgba(16, 185, 129, 0.4);
   border-radius: var(--radius);
-  padding: 16px 20px;
+  padding: 18px 24px;
   margin-bottom: 16px;
 }
 
 .csv-upload-info strong {
   display: block;
-  font-size: 14px;
+  font-size: 15px;
   color: #34d399;
   margin-bottom: 4px;
 }
@@ -316,6 +376,59 @@ body {
 .csv-upload-info span {
   font-size: 12px;
   color: var(--text-muted);
+}
+
+.columns-pill-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.col-pill {
+  background: rgba(59, 130, 246, 0.15);
+  border: 1px solid rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+}
+
+.table-scroll-wrapper {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #090d16;
+}
+
+.data-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+
+.data-preview-table th {
+  background: #131c31;
+  color: #93c5fd;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  font-weight: 600;
+}
+
+.data-preview-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid #1e293b;
+  color: var(--text-main);
+  white-space: nowrap;
+}
+
+.data-preview-table tr:hover {
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .grid-2-col {
@@ -592,4 +705,8 @@ input:checked + .slider:before {
 .toast.show {
   opacity: 1;
   transform: translateY(0);
+}
+
+.hidden {
+  display: none !important;
 }

@@ -7,9 +7,11 @@
   let settings = null;
   let hudElement = null;
   let currentIdentity = null;
+  let currentCsvRow = null;
+  let currentCsvRowNumber = null;
 
   // Initialize and check if automation task is active
-  chrome.storage.local.get(['task', 'customFields', 'profile', 'settings', 'generatorSettings'], (res) => {
+  chrome.storage.local.get(['task', 'customFields', 'profile', 'settings', 'generatorSettings', 'datasetCsv'], (res) => {
     customFields = res.customFields || [];
     profileData = res.profile || {};
     settings = res.settings || getDefaultSettings();
@@ -52,8 +54,26 @@
   }
 
   async function prepareIterationIdentity() {
-    const data = await chrome.storage.local.get('generatorSettings');
+    const data = await chrome.storage.local.get(['generatorSettings', 'datasetCsv']);
     const gen = data.generatorSettings || getDefaultGeneratorSettings();
+    const dataset = data.datasetCsv;
+
+    // Load current CSV row if available
+    if (dataset && dataset.rows && dataset.rows.length > 0) {
+      const rowIdx = dataset.currentRowIndex || 0;
+      if (rowIdx < dataset.rows.length) {
+        currentCsvRow = dataset.rows[rowIdx];
+        currentCsvRowNumber = rowIdx + 1;
+        console.log(`[AutoApply] Using CSV Row #${currentCsvRowNumber}:`, currentCsvRow);
+      } else {
+        console.warn(`[AutoApply] All ${dataset.rows.length} CSV rows have been consumed!`);
+        currentCsvRow = null;
+        currentCsvRowNumber = null;
+      }
+    } else {
+      currentCsvRow = null;
+      currentCsvRowNumber = null;
+    }
 
     // 1. Pick First Name & Last Name from pool
     const firstPool = (gen.firstNamesPool && gen.firstNamesPool.length > 0) ? gen.firstNamesPool : ['Alex', 'John', 'Michael', 'Sarah'];
@@ -100,6 +120,20 @@
     const mode = field.answerMode;
     const rawAnswer = field.answer || '';
 
+    // CSV Column value from current row
+    if (mode === 'csv_col' || (rawAnswer && rawAnswer.startsWith('{{CSV:'))) {
+      let colIdx = field.csvColIndex;
+      if (colIdx === undefined && rawAnswer.startsWith('{{CSV:')) {
+        colIdx = parseInt(rawAnswer.slice(6, -2), 10);
+      }
+      if (isNaN(colIdx)) colIdx = 0;
+
+      if (currentCsvRow && currentCsvRow[colIdx] !== undefined) {
+        return currentCsvRow[colIdx];
+      }
+      return '';
+    }
+
     if (mode === 'dynamic_random_15' || rawAnswer === '{{RANDOM_TEXT_15}}') {
       return generateRandomAlpha(15);
     }
@@ -121,6 +155,12 @@
 
     // Support token replacement in custom strings
     let resolved = rawAnswer;
+    if (resolved.includes('{{CSV:') && currentCsvRow) {
+      resolved = resolved.replace(/{{CSV:(\d+)}}/g, (_, col) => {
+        const idx = parseInt(col, 10);
+        return currentCsvRow[idx] !== undefined ? currentCsvRow[idx] : '';
+      });
+    }
     if (resolved.includes('{{RANDOM_TEXT_15}}')) {
       resolved = resolved.replace(/{{RANDOM_TEXT_15}}/g, generateRandomAlpha(15));
     }
@@ -181,7 +221,8 @@
     if (msgEl) msgEl.textContent = message;
     if (barEl && progressPercent !== undefined) barEl.style.width = `${progressPercent}%`;
     if (iterEl && currentTask) {
-      iterEl.textContent = `Iteration ${currentTask.currentIteration} of ${currentTask.totalIterations}`;
+      const csvBadge = currentCsvRowNumber ? ` | CSV #${currentCsvRowNumber}` : '';
+      iterEl.textContent = `Iter ${currentTask.currentIteration}/${currentTask.totalIterations}${csvBadge}`;
     }
   }
 
@@ -209,8 +250,9 @@
     // Generate dynamic iteration identity (name from pool, phone 92310..., email with last 5 digits)
     await prepareIterationIdentity();
 
+    const rowInfo = currentCsvRowNumber ? ` (CSV Row #${currentCsvRowNumber})` : '';
     createHUD();
-    updateHUDStatus(`Applying as: ${currentIdentity.fullName}`, 10);
+    updateHUDStatus(`Applying as: ${currentIdentity.fullName}${rowInfo}`, 10);
     await sleep(600);
 
     try {

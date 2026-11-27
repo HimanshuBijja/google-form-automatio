@@ -153,6 +153,20 @@ async function handleFormSubmitted(info) {
 
     console.log(`[AutoApply] Completed Iteration ${currentIter} of ${totalIters}`);
 
+    // Advance CSV row pointer and record last submitted row so no row is ever used twice
+    try {
+      const { datasetCsv } = await chrome.storage.local.get('datasetCsv');
+      if (datasetCsv && datasetCsv.rows && datasetCsv.rows.length > 0) {
+        const finishedRowIdx = datasetCsv.currentRowIndex || 0;
+        datasetCsv.lastSubmittedRowIndex = finishedRowIdx;
+        datasetCsv.currentRowIndex = finishedRowIdx + 1;
+        await chrome.storage.local.set({ datasetCsv });
+        console.log(`[AutoApply] Completed CSV row #${finishedRowIdx + 1}. Next row is #${datasetCsv.currentRowIndex + 1} of ${datasetCsv.totalRows}`);
+      }
+    } catch (e) {
+      console.warn('[AutoApply] Could not update datasetCsv pointer:', e);
+    }
+
     if (currentIter < totalIters) {
       // Advance to next iteration
       task.currentIteration = currentIter + 1;

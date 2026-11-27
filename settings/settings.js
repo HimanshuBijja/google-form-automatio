@@ -1,10 +1,10 @@
-// AutoApply - Settings Dashboard with Dynamic Generators & CSV Mix-and-Match
+// AutoApply - Settings Dashboard with CSV Dataset (Row-by-Row Runner)
 
 document.addEventListener('DOMContentLoaded', async () => {
   // Elements
   const fieldsContainer = document.getElementById('fields-container');
   const fieldCountBadge = document.getElementById('field-count-badge');
-  const poolCountBadge = document.getElementById('pool-count-badge');
+  const csvStatusBadge = document.getElementById('csv-status-badge');
   const btnAddField = document.getElementById('btn-add-field');
   const btnLoadDefaults = document.getElementById('btn-load-defaults');
   const btnSaveAll = document.getElementById('btn-save-all');
@@ -14,9 +14,25 @@ document.addEventListener('DOMContentLoaded', async () => {
   const inputSearch = document.getElementById('input-search');
   const toast = document.getElementById('toast');
 
+  // CSV Dataset Elements
+  const btnUploadDatasetCsv = document.getElementById('btn-upload-dataset-csv');
+  const fileDatasetCsvInput = document.getElementById('file-dataset-csv-input');
+  const btnClearCsv = document.getElementById('btn-clear-csv');
+  const csvFilenameLabel = document.getElementById('csv-filename-label');
+  const csvSummaryLabel = document.getElementById('csv-summary-label');
+  const csvLastSubmittedText = document.getElementById('csv-last-submitted-text');
+  const csvNextRowText = document.getElementById('csv-next-row-text');
+  const inputJumpRow = document.getElementById('input-jump-row');
+  const btnSetRow = document.getElementById('btn-set-row');
+  const btnStepPrev = document.getElementById('btn-step-prev');
+  const btnStepNext = document.getElementById('btn-step-next');
+  const csvRemainingHint = document.getElementById('csv-remaining-hint');
+  const btnResetCsvPointer = document.getElementById('btn-reset-csv-pointer');
+  const csvColumnsPillContainer = document.getElementById('csv-columns-pill-container');
+  const csvPreviewTable = document.getElementById('csv-preview-table');
+  const btnSaveCsvTab = document.getElementById('btn-save-csv-tab');
+
   // Name Pool Elements
-  const btnUploadCsv = document.getElementById('btn-upload-csv');
-  const fileCsvInput = document.getElementById('file-csv-input');
   const textareaFirstNames = document.getElementById('textarea-first-names');
   const textareaLastNames = document.getElementById('textarea-last-names');
   const firstNamesCount = document.getElementById('first-names-count');
@@ -45,6 +61,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   let fieldsData = [];
   let settingsData = {};
   let generatorSettings = {};
+  let datasetCsv = {
+    fileName: '',
+    headers: [],
+    rows: [],
+    currentRowIndex: 0,
+    totalRows: 0
+  };
 
   // Tab switching
   navBtns.forEach(btn => {
@@ -58,9 +81,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // Load from Storage
-  const res = await chrome.storage.local.get(['customFields', 'settings', 'generatorSettings']);
+  const res = await chrome.storage.local.get(['customFields', 'settings', 'generatorSettings', 'datasetCsv']);
   settingsData = res.settings || getDefaultSettings();
   generatorSettings = res.generatorSettings || getDefaultGeneratorSettings();
+  if (res.datasetCsv) {
+    datasetCsv = res.datasetCsv;
+  }
 
   // Populate Fields
   if (res.customFields && Array.isArray(res.customFields) && res.customFields.length > 0) {
@@ -68,6 +94,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   } else {
     fieldsData = getDefaultCustomFields();
   }
+
+  // Populate CSV Dataset UI
+  updateDatasetCsvUI();
 
   // Populate Name Pool & Generator Settings
   textareaFirstNames.value = (generatorSettings.firstNamesPool || []).join('\n');
@@ -89,7 +118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     cfgTypingDelayVal.textContent = `${e.target.value} ms`;
   });
 
-  // Render initial list
+  // Render initial fields list
   renderFields(fieldsData);
 
   // Search filtering
@@ -98,7 +127,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const rows = fieldsContainer.querySelectorAll('.field-card');
     rows.forEach(row => {
       const qText = row.querySelector('.field-question').value.toLowerCase();
-      const aText = row.querySelector('.field-answer').value.toLowerCase();
+      const aText = (row.querySelector('.field-answer')?.value || '').toLowerCase();
       if (qText.includes(query) || aText.includes(query)) {
         row.style.display = 'grid';
       } else {
@@ -114,6 +143,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       question: '',
       type: 'text',
       answerMode: 'custom',
+      csvColIndex: 0,
       answer: ''
     };
     fieldsData.unshift(newField);
@@ -155,6 +185,17 @@ document.addEventListener('DOMContentLoaded', async () => {
       card.dataset.id = item.id || 'f_' + index;
 
       const currentMode = item.answerMode || detectModeFromAnswer(item.answer);
+      const csvColIdx = item.csvColIndex !== undefined ? item.csvColIndex : parseCsvColIndexFromToken(item.answer);
+
+      // Build options for CSV column dropdown
+      let csvColOptionsHtml = '';
+      if (datasetCsv.headers && datasetCsv.headers.length > 0) {
+        datasetCsv.headers.forEach((h, colI) => {
+          csvColOptionsHtml += `<option value="${colI}" ${csvColIdx === colI ? 'selected' : ''}>Col ${colI + 1}: ${escapeHtml(h)}</option>`;
+        });
+      } else {
+        csvColOptionsHtml = `<option value="0">Col 1 (Upload CSV first)</option>`;
+      }
 
       card.innerHTML = `
         <div class="field-num">#${index + 1}</div>
@@ -183,6 +224,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             <div class="answer-mode-row">
               <select class="answer-mode-select">
                 <option value="custom" ${currentMode === 'custom' ? 'selected' : ''}>✏️ Custom Text</option>
+                <option value="csv_col" ${currentMode === 'csv_col' ? 'selected' : ''}>📊 From CSV (Row by Row)</option>
                 <option value="dynamic_random_15" ${currentMode === 'dynamic_random_15' ? 'selected' : ''}>🎲 Random 15-char (a-zA-Z)</option>
                 <option value="dynamic_fullname" ${currentMode === 'dynamic_fullname' ? 'selected' : ''}>👤 Mixed Full Name</option>
                 <option value="dynamic_firstname" ${currentMode === 'dynamic_firstname' ? 'selected' : ''}>🔤 First Name only</option>
@@ -190,7 +232,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <option value="dynamic_email" ${currentMode === 'dynamic_email' ? 'selected' : ''}>📧 Auto Email (name + phone digits)</option>
                 <option value="dynamic_phone" ${currentMode === 'dynamic_phone' ? 'selected' : ''}>📞 Auto Phone (92310 + counter)</option>
               </select>
-              <input type="text" class="field-input field-answer" placeholder="${getPlaceholderForMode(currentMode, item.type)}" value="${escapeHtml(item.answer || '')}" ${currentMode !== 'custom' ? 'readonly style="background:#131c31; color:#34d399; font-weight:600;"' : ''} />
+
+              <select class="csv-col-select ${currentMode === 'csv_col' ? '' : 'hidden'}">
+                ${csvColOptionsHtml}
+              </select>
+
+              <input type="text" class="field-input field-answer ${currentMode === 'csv_col' ? 'hidden' : ''}" placeholder="${getPlaceholderForMode(currentMode, item.type)}" value="${escapeHtml(item.answer || '')}" ${currentMode !== 'custom' ? 'readonly style="background:#131c31; color:#34d399; font-weight:600;"' : ''} />
             </div>
           </div>
         </div>
@@ -202,11 +249,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
       // Answer Mode dropdown listener
       const modeSelect = card.querySelector('.answer-mode-select');
+      const csvColSelect = card.querySelector('.csv-col-select');
       const answerInput = card.querySelector('.field-answer');
 
       modeSelect.addEventListener('change', (e) => {
         const mode = e.target.value;
         if (mode === 'custom') {
+          csvColSelect.classList.add('hidden');
+          answerInput.classList.remove('hidden');
           answerInput.readOnly = false;
           answerInput.style.background = 'var(--bg-input)';
           answerInput.style.color = 'var(--text-main)';
@@ -214,12 +264,23 @@ document.addEventListener('DOMContentLoaded', async () => {
           if (answerInput.value.startsWith('{{') && answerInput.value.endsWith('}}')) {
             answerInput.value = '';
           }
+        } else if (mode === 'csv_col') {
+          csvColSelect.classList.remove('hidden');
+          answerInput.classList.add('hidden');
+          answerInput.value = `{{CSV:${csvColSelect.value}}}`;
         } else {
+          csvColSelect.classList.add('hidden');
+          answerInput.classList.remove('hidden');
           answerInput.readOnly = true;
           answerInput.style.background = '#131c31';
           answerInput.style.color = '#34d399';
           answerInput.value = getTokenForMode(mode);
         }
+      });
+
+      // CSV Column dropdown listener
+      csvColSelect.addEventListener('change', (e) => {
+        answerInput.value = `{{CSV:${e.target.value}}}`;
       });
 
       // Delete listener
@@ -234,6 +295,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   function detectModeFromAnswer(ans) {
+    if (!ans) return 'custom';
+    if (ans.startsWith('{{CSV:') && ans.endsWith('}}')) return 'csv_col';
     if (ans === '{{RANDOM_TEXT_15}}') return 'dynamic_random_15';
     if (ans === '{{MIXED_FULL_NAME}}') return 'dynamic_fullname';
     if (ans === '{{FIRST_NAME}}') return 'dynamic_firstname';
@@ -241,6 +304,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (ans === '{{AUTO_EMAIL}}') return 'dynamic_email';
     if (ans === '{{AUTO_PHONE}}') return 'dynamic_phone';
     return 'custom';
+  }
+
+  function parseCsvColIndexFromToken(ans) {
+    if (ans && ans.startsWith('{{CSV:') && ans.endsWith('}}')) {
+      const inside = ans.slice(6, -2);
+      const parsed = parseInt(inside, 10);
+      return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
   }
 
   function getTokenForMode(mode) {
@@ -272,9 +344,14 @@ document.addEventListener('DOMContentLoaded', async () => {
       const q = row.querySelector('.field-question').value.trim();
       const type = row.querySelector('.field-type').value;
       const mode = row.querySelector('.answer-mode-select').value;
+      const csvColSelect = row.querySelector('.csv-col-select');
       let ans = row.querySelector('.field-answer').value.trim();
+      let colIdx = 0;
 
-      if (mode !== 'custom') {
+      if (mode === 'csv_col') {
+        colIdx = parseInt(csvColSelect.value, 10) || 0;
+        ans = `{{CSV:${colIdx}}}`;
+      } else if (mode !== 'custom') {
         ans = getTokenForMode(mode);
       }
 
@@ -284,6 +361,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           question: q,
           type: type,
           answerMode: mode,
+          csvColIndex: colIdx,
           answer: ans
         });
       }
@@ -314,70 +392,259 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
   }
 
-  // --- CSV UPLOADER ---
-  btnUploadCsv.addEventListener('click', () => {
-    fileCsvInput.click();
+  // --- CSV DATASET UPLOADER & ROW-BY-ROW LOGIC ---
+
+  btnUploadDatasetCsv.addEventListener('click', () => {
+    fileDatasetCsvInput.click();
   });
 
-  fileCsvInput.addEventListener('change', (e) => {
+  fileDatasetCsvInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target.result;
-      parseAndLoadCSV(text);
-      fileCsvInput.value = '';
+      parseDatasetCSV(file.name, text);
+      fileDatasetCsvInput.value = '';
     };
     reader.readAsText(file);
   });
 
-  function parseAndLoadCSV(content) {
-    const lines = content.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-    const newFirst = [];
-    const newLast = [];
+  function parseDatasetCSV(fileName, rawText) {
+    const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    if (lines.length === 0) {
+      alert('CSV file is empty!');
+      return;
+    }
 
-    lines.forEach((line, index) => {
-      // Split by comma or semicolon or tab
-      const parts = line.split(/[,;\t]/).map(p => p.trim().replace(/^["']|["']$/g, ''));
-      if (parts.length >= 2) {
-        // Skip header row if it contains 'first' or 'last'
-        if (index === 0 && (parts[0].toLowerCase().includes('first') || parts[1].toLowerCase().includes('last'))) {
-          return;
-        }
-        if (parts[0]) newFirst.push(parts[0]);
-        if (parts[1]) newLast.push(parts[1]);
-      } else if (parts.length === 1 && parts[0]) {
-        // Space separated: e.g. "John Doe"
-        const nameParts = parts[0].split(/\s+/);
-        if (nameParts.length >= 2) {
-          newFirst.push(nameParts[0]);
-          newLast.push(nameParts.slice(1).join(' '));
+    // Robust CSV line parser supporting quoted values
+    function parseCSVLine(line) {
+      const result = [];
+      let current = '';
+      let insideQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          if (insideQuotes && line[i + 1] === '"') {
+            current += '"';
+            i++;
+          } else {
+            insideQuotes = !insideQuotes;
+          }
+        } else if (char === ',' && !insideQuotes) {
+          result.push(current.trim());
+          current = '';
         } else {
-          newFirst.push(parts[0]);
+          current += char;
         }
       }
-    });
-
-    if (newFirst.length > 0) {
-      textareaFirstNames.value = newFirst.join('\n');
-    }
-    if (newLast.length > 0) {
-      textareaLastNames.value = newLast.join('\n');
+      result.push(current.trim());
+      return result;
     }
 
-    updatePoolCounts();
-    updateSampleEmail();
-    showToast(`✓ Loaded ${newFirst.length} First Names & ${newLast.length} Last Names from CSV!`);
+    const parsedRows = lines.map(parseCSVLine);
+    let headers = [];
+    let dataRows = [];
+
+    // First line as headers
+    if (parsedRows.length > 0) {
+      headers = parsedRows[0];
+      dataRows = parsedRows.slice(1);
+    }
+
+    // If only 1 line in file or no explicit headers
+    if (dataRows.length === 0 && parsedRows.length > 0) {
+      headers = parsedRows[0].map((_, i) => `Column ${i + 1}`);
+      dataRows = parsedRows;
+    }
+
+    datasetCsv = {
+      fileName: fileName,
+      headers: headers,
+      rows: dataRows,
+      currentRowIndex: 0,
+      totalRows: dataRows.length
+    };
+
+    chrome.storage.local.set({ datasetCsv });
+    updateDatasetCsvUI();
+    renderFields(fieldsData); // Re-render to update CSV column dropdowns
+    showToast(`✓ Uploaded ${fileName}: ${dataRows.length} rows and ${headers.length} columns loaded!`);
   }
 
-  // Pool count updates
+  function updateDatasetCsvUI() {
+    if (datasetCsv && datasetCsv.totalRows > 0) {
+      csvStatusBadge.textContent = `${datasetCsv.totalRows} rows`;
+      csvStatusBadge.style.color = '#34d399';
+      csvFilenameLabel.textContent = `Active CSV: ${datasetCsv.fileName || 'dataset.csv'}`;
+      csvSummaryLabel.textContent = `Total ${datasetCsv.totalRows} rows loaded. Columns: ${datasetCsv.headers.join(', ')}`;
+      btnClearCsv.classList.remove('hidden');
+
+      const nextRow = (datasetCsv.currentRowIndex || 0) + 1;
+      const lastRow = (datasetCsv.lastSubmittedRowIndex !== undefined && datasetCsv.lastSubmittedRowIndex !== null)
+        ? (datasetCsv.lastSubmittedRowIndex + 1)
+        : null;
+
+      if (csvLastSubmittedText) {
+        csvLastSubmittedText.textContent = lastRow ? `Row #${lastRow}` : 'None (Starting fresh)';
+      }
+      if (csvNextRowText) {
+        csvNextRowText.textContent = nextRow > datasetCsv.totalRows
+          ? `Row #${datasetCsv.totalRows} (All ${datasetCsv.totalRows} rows consumed!)`
+          : `Row #${nextRow} of ${datasetCsv.totalRows}`;
+      }
+      if (inputJumpRow) {
+        inputJumpRow.max = datasetCsv.totalRows;
+        inputJumpRow.value = Math.min(nextRow, datasetCsv.totalRows);
+      }
+
+      const remaining = Math.max(0, datasetCsv.totalRows - (datasetCsv.currentRowIndex || 0));
+      csvRemainingHint.textContent = `${remaining} rows remaining. Next run starts at Row #${Math.min(nextRow, datasetCsv.totalRows)}. AutoApply saves your exact place, so you can stop now and resume tomorrow seamlessly!`;
+
+      // Render columns pills
+      csvColumnsPillContainer.innerHTML = '';
+      datasetCsv.headers.forEach((h, i) => {
+        const pill = document.createElement('span');
+        pill.className = 'col-pill';
+        pill.textContent = `Col ${i + 1}: ${h}`;
+        csvColumnsPillContainer.appendChild(pill);
+      });
+
+      // Render Preview Table (centered around current row to verify data!)
+      let tableHtml = '<thead><tr><th>Row #</th>';
+      datasetCsv.headers.forEach(h => {
+        tableHtml += `<th>${escapeHtml(h)}</th>`;
+      });
+      tableHtml += '</tr></thead><tbody>';
+
+      const currIdx = datasetCsv.currentRowIndex || 0;
+      const startIdx = Math.max(0, currIdx - 1);
+      const endIdx = Math.min(datasetCsv.totalRows, startIdx + 8);
+      const previewRows = datasetCsv.rows.slice(startIdx, endIdx);
+
+      if (startIdx > 0) {
+        tableHtml += `<tr><td colspan="${datasetCsv.headers.length + 1}" style="text-align:center; color:var(--text-muted); font-size:11px; padding:4px;">... ${startIdx} earlier rows ...</td></tr>`;
+      }
+
+      previewRows.forEach((r, offset) => {
+        const actualIdx = startIdx + offset;
+        const isCurrent = actualIdx === currIdx;
+        const isLastSubmitted = actualIdx === datasetCsv.lastSubmittedRowIndex;
+
+        let rowStyle = '';
+        let badge = '';
+        if (isCurrent) {
+          rowStyle = 'background: rgba(16, 185, 129, 0.2); font-weight: 700; color: #fff;';
+          badge = ' <span style="background:#10b981; color:#0b1120; font-size:10px; padding:2px 6px; border-radius:4px; margin-left:6px;">👉 NEXT TO FILL</span>';
+        } else if (isLastSubmitted) {
+          rowStyle = 'background: rgba(59, 130, 246, 0.12); color: #94a3b8;';
+          badge = ' <span style="background:#3b82f6; color:#fff; font-size:10px; padding:2px 6px; border-radius:4px; margin-left:6px;">✓ SUBMITTED</span>';
+        }
+
+        tableHtml += `<tr style="${rowStyle}">`;
+        tableHtml += `<td><strong>#${actualIdx + 1}</strong>${badge}</td>`;
+        datasetCsv.headers.forEach((_, cIdx) => {
+          tableHtml += `<td>${escapeHtml(r[cIdx] || '')}</td>`;
+        });
+        tableHtml += '</tr>';
+      });
+
+      if (endIdx < datasetCsv.totalRows) {
+        tableHtml += `<tr><td colspan="${datasetCsv.headers.length + 1}" style="text-align:center; color:var(--text-muted); font-size:11px; padding:4px;">... ${datasetCsv.totalRows - endIdx} remaining rows ...</td></tr>`;
+      }
+      tableHtml += '</tbody>';
+      csvPreviewTable.innerHTML = tableHtml;
+    } else {
+      csvStatusBadge.textContent = 'No CSV';
+      csvStatusBadge.style.color = 'var(--text-muted)';
+      csvFilenameLabel.textContent = 'Upload Your CSV Dataset';
+      csvSummaryLabel.textContent = 'Upload a CSV with multiple rows and columns (e.g., Name, Email, Custom Answers).';
+      btnClearCsv.classList.add('hidden');
+      if (csvLastSubmittedText) csvLastSubmittedText.textContent = 'None';
+      if (csvNextRowText) csvNextRowText.textContent = 'Row 0 of 0';
+      if (inputJumpRow) inputJumpRow.value = 1;
+      csvRemainingHint.textContent = '0 rows in dataset. Upload a CSV file to start consuming row-by-row.';
+      csvColumnsPillContainer.innerHTML = `<span style="color:var(--text-muted); font-size:12px;">No CSV loaded yet. Upload a CSV to see columns.</span>`;
+      csvPreviewTable.innerHTML = `<thead><tr><th>Status</th></tr></thead><tbody><tr><td>No data loaded</td></tr></tbody>`;
+    }
+  }
+
+  // Set / Jump to specific Row
+  btnSetRow?.addEventListener('click', async () => {
+    if (!datasetCsv || datasetCsv.totalRows === 0) {
+      alert('Please upload a CSV dataset first!');
+      return;
+    }
+    const entered = parseInt(inputJumpRow.value, 10);
+    if (isNaN(entered) || entered < 1 || entered > datasetCsv.totalRows) {
+      alert(`Please enter a valid row number between 1 and ${datasetCsv.totalRows}`);
+      return;
+    }
+
+    datasetCsv.currentRowIndex = entered - 1;
+    await chrome.storage.local.set({ datasetCsv });
+    updateDatasetCsvUI();
+    showToast(`✓ Next row successfully set to Row #${entered}!`);
+  });
+
+  // Step -1
+  btnStepPrev?.addEventListener('click', async () => {
+    if (!datasetCsv || datasetCsv.totalRows === 0) return;
+    const curr = datasetCsv.currentRowIndex || 0;
+    if (curr > 0) {
+      datasetCsv.currentRowIndex = curr - 1;
+      await chrome.storage.local.set({ datasetCsv });
+      updateDatasetCsvUI();
+      showToast(`Moved back to Row #${datasetCsv.currentRowIndex + 1}`);
+    }
+  });
+
+  // Step +1
+  btnStepNext?.addEventListener('click', async () => {
+    if (!datasetCsv || datasetCsv.totalRows === 0) return;
+    const curr = datasetCsv.currentRowIndex || 0;
+    if (curr < datasetCsv.totalRows - 1) {
+      datasetCsv.currentRowIndex = curr + 1;
+      await chrome.storage.local.set({ datasetCsv });
+      updateDatasetCsvUI();
+      showToast(`Advanced to Row #${datasetCsv.currentRowIndex + 1}`);
+    }
+  });
+
+  // Reset Row Pointer to Row 1
+  btnResetCsvPointer.addEventListener('click', async () => {
+    if (datasetCsv) {
+      datasetCsv.currentRowIndex = 0;
+      await chrome.storage.local.set({ datasetCsv });
+      updateDatasetCsvUI();
+      showToast('Row pointer reset to Row 1!');
+    }
+  });
+
+  // Clear CSV
+  btnClearCsv.addEventListener('click', async () => {
+    if (confirm('Clear current CSV dataset?')) {
+      datasetCsv = { fileName: '', headers: [], rows: [], currentRowIndex: 0, totalRows: 0 };
+      await chrome.storage.local.set({ datasetCsv });
+      updateDatasetCsvUI();
+      renderFields(fieldsData);
+      showToast('CSV dataset cleared.');
+    }
+  });
+
+  // Save CSV Tab Button
+  btnSaveCsvTab.addEventListener('click', async () => {
+    await chrome.storage.local.set({ datasetCsv });
+    showToast('CSV Dataset settings saved!');
+  });
+
+  // --- NAME POOL & COUNTERS ---
   function updatePoolCounts() {
     const fCount = textareaFirstNames.value.split('\n').filter(s => s.trim()).length;
     const lCount = textareaLastNames.value.split('\n').filter(s => s.trim()).length;
     firstNamesCount.textContent = fCount;
     lastNamesCount.textContent = lCount;
-    poolCountBadge.textContent = `${fCount} × ${lCount} names (${fCount * lCount} combos)`;
   }
 
   textareaFirstNames.addEventListener('input', () => { updatePoolCounts(); updateSampleEmail(); });
@@ -426,12 +693,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     await chrome.storage.local.set({
       customFields: fieldsData,
       settings: settingsData,
-      generatorSettings: generatorSettings
+      generatorSettings: generatorSettings,
+      datasetCsv: datasetCsv
     });
 
     renderFields(fieldsData);
+    updateDatasetCsvUI();
     updatePoolCounts();
-    showToast('🎉 All fields, dynamic generators, and name pool saved!');
+    showToast('🎉 All fields, CSV dataset mappings, and settings saved!');
   });
 
   // Save Pool Tab Button
@@ -439,7 +708,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     generatorSettings = collectGeneratorSettings();
     await chrome.storage.local.set({ generatorSettings });
     updatePoolCounts();
-    showToast('Name pool and phone generator settings saved!');
+    showToast('Name pool saved!');
   });
 
   // Save Config Tab Button
@@ -453,11 +722,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnExportJson.addEventListener('click', () => {
     fieldsData = collectFieldsFromDOM();
     const exportPayload = {
-      version: '2.0',
+      version: '3.0',
       exportedAt: new Date().toISOString(),
       fields: fieldsData,
       settings: collectSettingsFromDOM(),
-      generatorSettings: collectGeneratorSettings()
+      generatorSettings: collectGeneratorSettings(),
+      datasetCsv: datasetCsv
     };
 
     const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: 'application/json' });
@@ -487,23 +757,19 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (Array.isArray(importedFields)) {
           fieldsData = importedFields;
           if (imported.settings) settingsData = imported.settings;
-          if (imported.generatorSettings) {
-            generatorSettings = imported.generatorSettings;
-            textareaFirstNames.value = (generatorSettings.firstNamesPool || []).join('\n');
-            textareaLastNames.value = (generatorSettings.lastNamesPool || []).join('\n');
-            cfgPhonePrefix.value = generatorSettings.phonePrefix || '92310';
-            cfgPhoneCounter.value = generatorSettings.phoneCounter || 1234;
-          }
+          if (imported.generatorSettings) generatorSettings = imported.generatorSettings;
+          if (imported.datasetCsv) datasetCsv = imported.datasetCsv;
 
           await chrome.storage.local.set({
             customFields: fieldsData,
             settings: settingsData,
-            generatorSettings: generatorSettings
+            generatorSettings: generatorSettings,
+            datasetCsv: datasetCsv
           });
 
           renderFields(fieldsData);
+          updateDatasetCsvUI();
           updatePoolCounts();
-          updateSampleEmail();
           showToast('Imported and saved configuration successfully!');
         } else {
           alert('Invalid format: Could not find fields in JSON file.');
@@ -545,7 +811,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       { id: 'f_12', question: 'Gender', type: 'radio', answerMode: 'custom', answer: 'Prefer not to say' },
       { id: 'f_13', question: 'Skills / Technologies', type: 'checkbox', answerMode: 'custom', answer: 'JavaScript, React, Node.js, Python, AWS' },
       { id: 'f_14', question: 'Notice Period', type: 'text', answerMode: 'custom', answer: '30 days' },
-      { id: 'f_15', question: 'Additional Notes / Other Info', type: 'text', answerMode: 'dynamic_random_15', answer: '{{RANDOM_TEXT_15}}' }
+      { id: 'f_15', question: 'Additional Notes / Unique Code', type: 'text', answerMode: 'dynamic_random_15', answer: '{{RANDOM_TEXT_15}}' }
     ];
   }
 
@@ -555,30 +821,8 @@ document.addEventListener('DOMContentLoaded', async () => {
       phoneCounter: 1234,
       emailDomain: '@gmail.com',
       randomTextLength: 15,
-      firstNamesPool: [
-        'James', 'Mary', 'John', 'Patricia', 'Robert', 'Jennifer', 'Michael', 'Linda', 'William', 'Elizabeth',
-        'David', 'Barbara', 'Richard', 'Susan', 'Joseph', 'Jessica', 'Thomas', 'Sarah', 'Charles', 'Karen',
-        'Christopher', 'Nancy', 'Daniel', 'Lisa', 'Matthew', 'Betty', 'Anthony', 'Margaret', 'Mark', 'Sandra',
-        'Donald', 'Ashley', 'Steven', 'Kimberly', 'Paul', 'Emily', 'Andrew', 'Donna', 'Joshua', 'Michelle',
-        'Kenneth', 'Carol', 'Kevin', 'Amanda', 'Brian', 'Melissa', 'George', 'Deborah', 'Timothy', 'Stephanie',
-        'Ronald', 'Rebecca', 'Edward', 'Sharon', 'Jason', 'Laura', 'Jeffrey', 'Cynthia', 'Ryan', 'Kathleen',
-        'Jacob', 'Amy', 'Gary', 'Shirley', 'Nicholas', 'Angela', 'Eric', 'Helen', 'Jonathan', 'Anna',
-        'Stephen', 'Brenda', 'Larry', 'Pamela', 'Justin', 'Nicole', 'Scott', 'Emma', 'Brandon', 'Samantha',
-        'Benjamin', 'Katherine', 'Samuel', 'Christine', 'Gregory', 'Debra', 'Frank', 'Rachel', 'Alexander', 'Catherine',
-        'Raymond', 'Carolyn', 'Patrick', 'Janet', 'Jack', 'Ruth', 'Dennis', 'Maria', 'Jerry', 'Heather'
-      ],
-      lastNamesPool: [
-        'Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez',
-        'Hernandez', 'Lopez', 'Gonzalez', 'Wilson', 'Anderson', 'Thomas', 'Taylor', 'Moore', 'Jackson', 'Martin',
-        'Lee', 'Perez', 'Thompson', 'White', 'Harris', 'Sanchez', 'Clark', 'Ramirez', 'Lewis', 'Robinson',
-        'Walker', 'Young', 'Allen', 'King', 'Wright', 'Scott', 'Torres', 'Nguyen', 'Hill', 'Flores',
-        'Green', 'Adams', 'Nelson', 'Baker', 'Hall', 'Rivera', 'Campbell', 'Mitchell', 'Carter', 'Roberts',
-        'Gomez', 'Phillips', 'Evans', 'Turner', 'Diaz', 'Parker', 'Cruz', 'Edwards', 'Collins', 'Reyes',
-        'Stewart', 'Morris', 'Morales', 'Murphy', 'Cook', 'Rogers', 'Gutierrez', 'Ortiz', 'Morgan', 'Cooper',
-        'Peterson', 'Bailey', 'Reed', 'Kelly', 'Howard', 'Ramos', 'Kim', 'Cox', 'Ward', 'Richardson',
-        'Watson', 'Brooks', 'Chavez', 'Wood', 'James', 'Bennett', 'Gray', 'Mendoza', 'Ruiz', 'Hughes',
-        'Price', 'Alvarez', 'Castillo', 'Sanders', 'Patel', 'Myers', 'Long', 'Ross', 'Foster', 'Jimenez'
-      ]
+      firstNamesPool: ['Alex', 'John', 'Michael', 'Sarah', 'David', 'James', 'Emily', 'Daniel', 'Matthew', 'Jessica'],
+      lastNamesPool: ['Morgan', 'Doe', 'Smith', 'Johnson', 'Brown', 'Williams', 'Miller', 'Davis', 'Wilson', 'Taylor']
     };
   }
 
@@ -587,7 +831,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       typingDelayMs: 25,
       fieldPauseMs: 350,
       autoSubmit: true,
-      submitDelayMs: 1000,
+      submitDelayMs: 800,
       closePreviousTab: true,
       nextTabDelayMs: 1500
     };

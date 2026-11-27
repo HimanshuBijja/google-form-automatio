@@ -24,6 +24,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const popFieldsList = document.getElementById('pop-fields-list');
   const popFieldCount = document.getElementById('pop-field-count');
 
+  // CSV Tracker Elements
+  const popCsvCard = document.getElementById('pop-csv-card');
+  const popCsvNextLabel = document.getElementById('pop-csv-next-label');
+  const popCsvLastSubmitted = document.getElementById('pop-csv-last-submitted');
+  const popInputRow = document.getElementById('pop-input-row');
+  const popBtnSetRow = document.getElementById('pop-btn-set-row');
+
   // Settings
   const setAutoSubmit = document.getElementById('set-autoSubmit');
   const setClosePrev = document.getElementById('set-closePrev');
@@ -51,13 +58,30 @@ document.addEventListener('DOMContentLoaded', async () => {
   btnLaunchFullscreen.addEventListener('click', openFullscreenSettings);
 
   // Load existing data from storage
-  const data = await chrome.storage.local.get(['customFields', 'settings', 'task']);
+  const data = await chrome.storage.local.get(['customFields', 'settings', 'task', 'datasetCsv']);
   const fields = data.customFields || [];
   const settings = data.settings || {};
   const task = data.task || {};
+  let datasetCsv = data.datasetCsv;
 
-  // Render quick fields list
+  // Render quick fields list & CSV tracker
   renderPopupFields(fields);
+  updatePopupCsvTracker(datasetCsv);
+
+  // Set / Jump CSV row from popup
+  popBtnSetRow?.addEventListener('click', async () => {
+    if (!datasetCsv || datasetCsv.totalRows === 0) return;
+    const targetRow = parseInt(popInputRow.value, 10);
+    if (isNaN(targetRow) || targetRow < 1 || targetRow > datasetCsv.totalRows) {
+      alert(`Please enter a row between 1 and ${datasetCsv.totalRows}`);
+      return;
+    }
+    datasetCsv.currentRowIndex = targetRow - 1;
+    await chrome.storage.local.set({ datasetCsv });
+    updatePopupCsvTracker(datasetCsv);
+    popBtnSetRow.textContent = '✓';
+    setTimeout(() => { popBtnSetRow.textContent = 'Set'; }, 1000);
+  });
 
   // Populate settings fields
   setAutoSubmit.checked = settings.autoSubmit !== false;
@@ -152,8 +176,27 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (namespace === 'local') {
       if (changes.task) updateTaskUI(changes.task.newValue);
       if (changes.customFields) renderPopupFields(changes.customFields.newValue || []);
+      if (changes.datasetCsv) {
+        datasetCsv = changes.datasetCsv.newValue;
+        updatePopupCsvTracker(datasetCsv);
+      }
     }
   });
+
+  function updatePopupCsvTracker(dataset) {
+    if (!popCsvCard) return;
+    if (dataset && dataset.totalRows > 0) {
+      popCsvCard.classList.remove('hidden');
+      const nextNum = (dataset.currentRowIndex || 0) + 1;
+      const lastNum = dataset.lastSubmittedRowIndex !== undefined ? (dataset.lastSubmittedRowIndex + 1) : null;
+      popCsvNextLabel.textContent = `Row #${nextNum} of ${dataset.totalRows}`;
+      popCsvLastSubmitted.textContent = lastNum ? `Last: #${lastNum}` : 'Last: None';
+      popInputRow.max = dataset.totalRows;
+      popInputRow.value = Math.min(nextNum, dataset.totalRows);
+    } else {
+      popCsvCard.classList.add('hidden');
+    }
+  }
 
   function renderPopupFields(list) {
     popFieldsList.innerHTML = '';
@@ -167,6 +210,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     list.slice(0, 15).forEach(item => {
       let displayAnswer = item.answer || '(empty)';
       if (item.answer === '{{RANDOM_TEXT_15}}') displayAnswer = '🎲 Random 15-char (a-zA-Z)';
+      else if (item.answer && item.answer.startsWith('{{CSV:')) displayAnswer = `📊 From CSV (Col ${parseInt(item.answer.slice(6, -2), 10) + 1})`;
       else if (item.answer === '{{MIXED_FULL_NAME}}') displayAnswer = '👤 Mixed Full Name (CSV)';
       else if (item.answer === '{{AUTO_EMAIL}}') displayAnswer = '📧 Auto Email (name + phone digits)';
       else if (item.answer === '{{AUTO_PHONE}}') displayAnswer = '📞 Auto Phone (92310xxxxx)';

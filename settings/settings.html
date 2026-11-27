@@ -14,7 +14,7 @@
         <span class="brand-logo">⚡</span>
         <div>
           <h1>AutoApply - Field Customizer & Settings</h1>
-          <p>Customize your questions, answers, dynamic generators, and CSV name mix-and-match pool.</p>
+          <p>Customize your questions, answers, CSV row-by-row dataset, and dynamic generators.</p>
         </div>
       </div>
       <div class="header-actions">
@@ -28,7 +28,8 @@
     <!-- Main Navigation Tabs -->
     <nav class="nav-bar">
       <button class="nav-btn active" data-tab="tab-fields">📝 Form Fields & Answers (<span id="field-count-badge">0</span>)</button>
-      <button class="nav-btn" data-tab="tab-names">👥 CSV & Name Pool (<span id="pool-count-badge">100 names</span>)</button>
+      <button class="nav-btn" data-tab="tab-csv-dataset">📊 CSV Dataset (Row-by-Row) (<span id="csv-status-badge">No CSV</span>)</button>
+      <button class="nav-btn" data-tab="tab-names">👥 Quick Name Pool</button>
       <button class="nav-btn" data-tab="tab-config">⚙️ Automation & Execution Settings</button>
     </nav>
 
@@ -48,7 +49,7 @@
 
       <!-- Info Banner -->
       <div class="info-banner">
-        💡 <strong>Dynamic Generation:</strong> In the <strong>Pre-seeded Answer / Value</strong> column, you can either enter static text OR choose <strong>🎲 Random 15-char Text (a-zA-Z)</strong>, <strong>👤 Mixed Full Name</strong>, <strong>📧 Auto Email</strong>, or <strong>📞 Auto Phone (92310xxxxx)</strong>.
+        💡 <strong>Pre-seeded Answer / Value:</strong> You can type static text, choose <strong>📊 From CSV (Row by Row)</strong> to consume your uploaded CSV one row at a time, or pick dynamic generators like <strong>🎲 Random 15-char Text (a-zA-Z)</strong>.
       </div>
 
       <!-- Fields List Container -->
@@ -57,26 +58,92 @@
       </div>
     </main>
 
-    <!-- Tab 2: Name Pool & CSV Customizer -->
-    <main id="tab-names" class="tab-content">
+    <!-- Tab 2: CSV Dataset (Row-by-Row Runner) -->
+    <main id="tab-csv-dataset" class="tab-content">
       <div class="settings-card">
-        <h2>👥 Name Pool & Sequential Generator Settings</h2>
-        <p class="section-desc">Upload a CSV or edit the First & Last Names below. AutoApply mixes and matches them randomly on each iteration!</p>
+        <h2>📊 CSV Dataset: Row-by-Row Sequential Runner</h2>
+        <p class="section-desc">Upload a CSV file containing your values. On each form submission, AutoApply takes data row-by-row so <strong>no row is ever used twice</strong>!</p>
 
         <!-- CSV Uploader Row -->
         <div class="csv-upload-box">
           <div class="csv-upload-info">
-            <strong>Upload CSV of Names</strong>
-            <span>Format: <code>First Name, Last Name</code> (header row optional, comma separated)</span>
+            <strong id="csv-filename-label">Upload Your CSV Dataset</strong>
+            <span id="csv-summary-label">Upload a CSV with multiple rows and columns (e.g., Name, Email, Custom Answers).</span>
           </div>
-          <div>
-            <button id="btn-upload-csv" class="btn btn-accent">📂 Select CSV File</button>
-            <input type="file" id="file-csv-input" accept=".csv,.txt" style="display:none;" />
+          <div style="display: flex; gap: 10px;">
+            <button id="btn-upload-dataset-csv" class="btn btn-accent">📂 Select CSV Dataset</button>
+            <input type="file" id="file-dataset-csv-input" accept=".csv,.txt" style="display:none;" />
+            <button id="btn-clear-csv" class="btn btn-secondary hidden" title="Clear current CSV dataset">Clear CSV</button>
           </div>
         </div>
 
+        <!-- Row Counter, Status & Manual Jump Control Box -->
+        <div id="csv-status-card" class="param-box" style="margin-bottom: 20px;">
+          <div class="field-label">Sequential Row Progress & Manual Row Selector</div>
+          
+          <div class="grid-2-col" style="margin-top: 10px; margin-bottom: 14px;">
+            <div class="status-metric-card">
+              <span class="metric-label">Last Submitted Row</span>
+              <span id="csv-last-submitted-text" class="metric-value-muted">None (Starting fresh)</span>
+            </div>
+            <div class="status-metric-card active-metric">
+              <span class="metric-label">Next Row to Fill</span>
+              <span id="csv-next-row-text" class="metric-value-active">Row 1 of 0</span>
+            </div>
+          </div>
+
+          <!-- Manual Change Row Control -->
+          <div class="jump-row-bar">
+            <div class="jump-input-group">
+              <label for="input-jump-row" style="font-size:12px; font-weight:600; color:var(--text-muted);">Change Next Row to:</label>
+              <div style="display:flex; gap:8px; align-items:center;">
+                <input type="number" id="input-jump-row" min="1" value="1" class="field-input" style="width: 130px; font-size:14px; font-weight:700; text-align:center;" />
+                <button id="btn-set-row" class="btn btn-primary" title="Apply and jump to this row">✓ Set Row</button>
+              </div>
+            </div>
+            <div class="jump-quick-buttons">
+              <button id="btn-step-prev" class="btn-tiny" title="Go to previous row">&larr; Prev Row</button>
+              <button id="btn-step-next" class="btn-tiny" title="Go to next row">Next Row &rarr;</button>
+              <button id="btn-reset-csv-pointer" class="btn btn-secondary" title="Reset row pointer back to Row 1">↺ Reset to Row 1</button>
+            </div>
+          </div>
+
+          <p class="hint" id="csv-remaining-hint" style="margin-top:10px;">0 rows remaining. When you resume tomorrow or next week, AutoApply automatically continues from where you left off!</p>
+        </div>
+
+        <!-- Detected Columns -->
+        <div class="param-box" style="margin-bottom: 20px;">
+          <div class="field-label">Detected CSV Columns</div>
+          <div id="csv-columns-pill-container" class="columns-pill-list" style="margin-top: 8px;">
+            <span style="color:var(--text-muted); font-size:12px;">No CSV loaded yet. Upload a CSV to see columns.</span>
+          </div>
+        </div>
+
+        <!-- Table Preview -->
+        <div class="param-box">
+          <div class="field-label" style="margin-bottom: 8px;">Dataset Table Preview (First 5 Rows)</div>
+          <div class="table-scroll-wrapper">
+            <table id="csv-preview-table" class="data-preview-table">
+              <thead><tr><th>Status</th></tr></thead>
+              <tbody><tr><td>No data loaded</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card-footer" style="margin-top: 20px;">
+          <button id="btn-save-csv-tab" class="btn btn-primary">💾 Save CSV Dataset Settings</button>
+        </div>
+      </div>
+    </main>
+
+    <!-- Tab 3: Name Pool & Quick Generators -->
+    <main id="tab-names" class="tab-content">
+      <div class="settings-card">
+        <h2>👥 Name Pool & Sequential Phone Generator</h2>
+        <p class="section-desc">Manage the default first & last name mix-and-match pool and the 92310 phone prefix.</p>
+
         <!-- Phone & Email Generation Parameters -->
-        <div class="grid-2-col" style="margin-top: 18px; margin-bottom: 20px;">
+        <div class="grid-2-col" style="margin-bottom: 20px;">
           <div class="param-box">
             <label class="field-label">Phone Prefix</label>
             <input type="text" id="cfg-phone-prefix" value="92310" class="field-input" placeholder="92310" />
@@ -106,7 +173,7 @@
               <h3>First Names (<span id="first-names-count">100</span>)</h3>
               <button id="btn-shuffle-first" class="btn-tiny" title="Shuffle list">🔀 Shuffle</button>
             </div>
-            <textarea id="textarea-first-names" rows="14" class="names-textarea" placeholder="One name per line..."></textarea>
+            <textarea id="textarea-first-names" rows="12" class="names-textarea" placeholder="One name per line..."></textarea>
           </div>
 
           <div class="name-column">
@@ -114,17 +181,17 @@
               <h3>Last Names (<span id="last-names-count">100</span>)</h3>
               <button id="btn-shuffle-last" class="btn-tiny" title="Shuffle list">🔀 Shuffle</button>
             </div>
-            <textarea id="textarea-last-names" rows="14" class="names-textarea" placeholder="One name per line..."></textarea>
+            <textarea id="textarea-last-names" rows="12" class="names-textarea" placeholder="One name per line..."></textarea>
           </div>
         </div>
 
         <div class="card-footer" style="margin-top: 20px;">
-          <button id="btn-save-pool" class="btn btn-primary">💾 Save Name Pool & Generator</button>
+          <button id="btn-save-pool" class="btn btn-primary">💾 Save Name Pool</button>
         </div>
       </div>
     </main>
 
-    <!-- Tab 3: Automation & Execution Settings -->
+    <!-- Tab 4: Automation & Execution Settings -->
     <main id="tab-config" class="tab-content">
       <div class="settings-card">
         <h2>⏱️ Speed & Tab Execution Controls</h2>
@@ -132,7 +199,7 @@
         <div class="setting-row">
           <div class="setting-info">
             <span class="setting-label">Auto-Submit Form</span>
-            <span class="setting-help">Automatically clicks the Submit button once all fields are filled. Turn off if you want to inspect fields before submitting.</span>
+            <span class="setting-help">Automatically clicks the Submit button once all fields are filled.</span>
           </div>
           <label class="switch">
             <input type="checkbox" id="cfg-autoSubmit" checked>
@@ -143,7 +210,7 @@
         <div class="setting-row">
           <div class="setting-info">
             <span class="setting-label">Close Previous Tab on New Iteration</span>
-            <span class="setting-help">Closes the submitted form tab before launching the next iteration tab to keep your browser clean.</span>
+            <span class="setting-help">Closes the submitted form tab before launching the next iteration tab.</span>
           </div>
           <label class="switch">
             <input type="checkbox" id="cfg-closePrev" checked>
