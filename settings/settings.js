@@ -144,6 +144,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       type: 'text',
       answerMode: 'custom',
       csvColIndex: 0,
+      csvPart: 'full',
       answer: ''
     };
     fieldsData.unshift(newField);
@@ -185,7 +186,9 @@ document.addEventListener('DOMContentLoaded', async () => {
       card.dataset.id = item.id || 'f_' + index;
 
       const currentMode = item.answerMode || detectModeFromAnswer(item.answer);
-      const csvColIdx = item.csvColIndex !== undefined ? item.csvColIndex : parseCsvColIndexFromToken(item.answer);
+      const tokenInfo = parseCsvTokenInfo(item.answer);
+      const csvColIdx = item.csvColIndex !== undefined ? item.csvColIndex : tokenInfo.colIndex;
+      const csvPart = item.csvPart || tokenInfo.part || 'full';
 
       // Build options for CSV column dropdown
       let csvColOptionsHtml = '';
@@ -233,8 +236,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <option value="dynamic_phone" ${currentMode === 'dynamic_phone' ? 'selected' : ''}>📞 Auto Phone (92310 + counter)</option>
               </select>
 
-              <select class="csv-col-select ${currentMode === 'csv_col' ? '' : 'hidden'}">
+              <select class="csv-col-select ${currentMode === 'csv_col' ? '' : 'hidden'}" title="Choose CSV Column">
                 ${csvColOptionsHtml}
+              </select>
+
+              <select class="csv-part-select ${currentMode === 'csv_col' ? '' : 'hidden'}" title="Choose Value Division (Full, First Name name.fn, or Last Name name.ln)">
+                <option value="full" ${csvPart === 'full' ? 'selected' : ''}>📄 Full Value</option>
+                <option value="name.fn" ${csvPart === 'name.fn' ? 'selected' : ''}>👤 name.fn (First Name)</option>
+                <option value="name.ln" ${csvPart === 'name.ln' ? 'selected' : ''}>👥 name.ln (Last Name)</option>
               </select>
 
               <input type="text" class="field-input field-answer ${currentMode === 'csv_col' ? 'hidden' : ''}" placeholder="${getPlaceholderForMode(currentMode, item.type)}" value="${escapeHtml(item.answer || '')}" ${currentMode !== 'custom' ? 'readonly style="background:#131c31; color:#34d399; font-weight:600;"' : ''} />
@@ -250,12 +259,24 @@ document.addEventListener('DOMContentLoaded', async () => {
       // Answer Mode dropdown listener
       const modeSelect = card.querySelector('.answer-mode-select');
       const csvColSelect = card.querySelector('.csv-col-select');
+      const csvPartSelect = card.querySelector('.csv-part-select');
       const answerInput = card.querySelector('.field-answer');
+
+      function updateCsvToken() {
+        const col = parseInt(csvColSelect.value, 10) || 0;
+        const part = csvPartSelect.value || 'full';
+        if (part && part !== 'full') {
+          answerInput.value = `{{CSV:${col}:${part}}}`;
+        } else {
+          answerInput.value = `{{CSV:${col}}}`;
+        }
+      }
 
       modeSelect.addEventListener('change', (e) => {
         const mode = e.target.value;
         if (mode === 'custom') {
           csvColSelect.classList.add('hidden');
+          csvPartSelect.classList.add('hidden');
           answerInput.classList.remove('hidden');
           answerInput.readOnly = false;
           answerInput.style.background = 'var(--bg-input)';
@@ -266,10 +287,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           }
         } else if (mode === 'csv_col') {
           csvColSelect.classList.remove('hidden');
+          csvPartSelect.classList.remove('hidden');
           answerInput.classList.add('hidden');
-          answerInput.value = `{{CSV:${csvColSelect.value}}}`;
+          updateCsvToken();
         } else {
           csvColSelect.classList.add('hidden');
+          csvPartSelect.classList.add('hidden');
           answerInput.classList.remove('hidden');
           answerInput.readOnly = true;
           answerInput.style.background = '#131c31';
@@ -279,8 +302,13 @@ document.addEventListener('DOMContentLoaded', async () => {
       });
 
       // CSV Column dropdown listener
-      csvColSelect.addEventListener('change', (e) => {
-        answerInput.value = `{{CSV:${e.target.value}}}`;
+      csvColSelect.addEventListener('change', () => {
+        updateCsvToken();
+      });
+
+      // CSV Part (name.fn / name.ln / full) dropdown listener
+      csvPartSelect.addEventListener('change', () => {
+        updateCsvToken();
       });
 
       // Delete listener
@@ -306,13 +334,26 @@ document.addEventListener('DOMContentLoaded', async () => {
     return 'custom';
   }
 
-  function parseCsvColIndexFromToken(ans) {
+  function parseCsvTokenInfo(ans) {
     if (ans && ans.startsWith('{{CSV:') && ans.endsWith('}}')) {
       const inside = ans.slice(6, -2);
-      const parsed = parseInt(inside, 10);
-      return isNaN(parsed) ? 0 : parsed;
+      const parsedCol = parseInt(inside, 10);
+      let part = 'full';
+      if (inside.includes('name.fn') || inside.includes(':fn')) {
+        part = 'name.fn';
+      } else if (inside.includes('name.ln') || inside.includes(':ln')) {
+        part = 'name.ln';
+      }
+      return {
+        colIndex: isNaN(parsedCol) ? 0 : parsedCol,
+        part: part
+      };
     }
-    return 0;
+    return { colIndex: 0, part: 'full' };
+  }
+
+  function parseCsvColIndexFromToken(ans) {
+    return parseCsvTokenInfo(ans).colIndex;
   }
 
   function getTokenForMode(mode) {
@@ -345,12 +386,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       const type = row.querySelector('.field-type').value;
       const mode = row.querySelector('.answer-mode-select').value;
       const csvColSelect = row.querySelector('.csv-col-select');
+      const csvPartSelect = row.querySelector('.csv-part-select');
       let ans = row.querySelector('.field-answer').value.trim();
       let colIdx = 0;
+      let part = 'full';
 
       if (mode === 'csv_col') {
         colIdx = parseInt(csvColSelect.value, 10) || 0;
-        ans = `{{CSV:${colIdx}}}`;
+        part = csvPartSelect ? csvPartSelect.value : 'full';
+        ans = (part && part !== 'full') ? `{{CSV:${colIdx}:${part}}}` : `{{CSV:${colIdx}}}`;
       } else if (mode !== 'custom') {
         ans = getTokenForMode(mode);
       }
@@ -362,6 +406,7 @@ document.addEventListener('DOMContentLoaded', async () => {
           type: type,
           answerMode: mode,
           csvColIndex: colIdx,
+          csvPart: part,
           answer: ans
         });
       }

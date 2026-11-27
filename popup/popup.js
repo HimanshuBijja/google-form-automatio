@@ -210,7 +210,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     list.slice(0, 15).forEach(item => {
       let displayAnswer = item.answer || '(empty)';
       if (item.answer === '{{RANDOM_TEXT_15}}') displayAnswer = '🎲 Random 15-char (a-zA-Z)';
-      else if (item.answer && item.answer.startsWith('{{CSV:')) displayAnswer = `📊 From CSV (Col ${parseInt(item.answer.slice(6, -2), 10) + 1})`;
+      else if (item.answer && item.answer.startsWith('{{CSV:')) {
+        const inside = item.answer.slice(6, -2);
+        const colNum = (parseInt(inside, 10) || 0) + 1;
+        let partLabel = '';
+        if (inside.includes('name.fn') || item.csvPart === 'name.fn') partLabel = ' (name.fn - First Name)';
+        else if (inside.includes('name.ln') || item.csvPart === 'name.ln') partLabel = ' (name.ln - Last Name)';
+        displayAnswer = `📊 From CSV (Col ${colNum}${partLabel})`;
+      }
       else if (item.answer === '{{MIXED_FULL_NAME}}') displayAnswer = '👤 Mixed Full Name (CSV)';
       else if (item.answer === '{{AUTO_EMAIL}}') displayAnswer = '📧 Auto Email (name + phone digits)';
       else if (item.answer === '{{AUTO_PHONE}}') displayAnswer = '📞 Auto Phone (92310xxxxx)';

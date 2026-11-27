@@ -272,6 +272,24 @@ body {
   flex: 1;
 }
 
+.csv-part-select {
+  background: #1e293b;
+  color: #fbbf24;
+  border: 1px solid #f59e0b;
+  border-radius: 6px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+  flex: 0 0 170px;
+}
+
+.csv-part-select:focus {
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
+
 .btn-delete {
   background: transparent;
   color: var(--danger);

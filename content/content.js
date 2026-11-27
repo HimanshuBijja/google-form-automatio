@@ -115,21 +115,47 @@
     return currentIdentity;
   }
 
+  function splitNameValue(val, part) {
+    const str = (val !== undefined && val !== null) ? String(val).trim() : '';
+    if (!part || part === 'full') return str;
+
+    const spaceIdx = str.indexOf(' ');
+    if (spaceIdx === -1) {
+      // If there is no space (only first name is there), second name falls back to first name
+      return str;
+    }
+
+    if (part === 'name.fn' || part === 'fn') {
+      return str.slice(0, spaceIdx).trim();
+    } else if (part === 'name.ln' || part === 'ln') {
+      return str.slice(spaceIdx + 1).trim();
+    }
+
+    return str;
+  }
+
   function resolveFieldValue(field) {
     if (!field) return '';
     const mode = field.answerMode;
     const rawAnswer = field.answer || '';
 
-    // CSV Column value from current row
+    // CSV Column value from current row (with support for name.fn and name.ln division)
     if (mode === 'csv_col' || (rawAnswer && rawAnswer.startsWith('{{CSV:'))) {
       let colIdx = field.csvColIndex;
-      if (colIdx === undefined && rawAnswer.startsWith('{{CSV:')) {
-        colIdx = parseInt(rawAnswer.slice(6, -2), 10);
+      let part = field.csvPart || 'full';
+      if (rawAnswer && rawAnswer.startsWith('{{CSV:')) {
+        const inside = rawAnswer.slice(6, -2);
+        const parsedCol = parseInt(inside, 10);
+        if (colIdx === undefined && !isNaN(parsedCol)) colIdx = parsedCol;
+        if (!field.csvPart) {
+          if (inside.includes('name.fn') || inside.includes(':fn')) part = 'name.fn';
+          else if (inside.includes('name.ln') || inside.includes(':ln')) part = 'name.ln';
+        }
       }
       if (isNaN(colIdx)) colIdx = 0;
 
       if (currentCsvRow && currentCsvRow[colIdx] !== undefined) {
-        return currentCsvRow[colIdx];
+        return splitNameValue(currentCsvRow[colIdx], part);
       }
       return '';
     }
@@ -153,12 +179,19 @@
       return currentIdentity ? currentIdentity.phone : '9231001234';
     }
 
-    // Support token replacement in custom strings
+    // Support token replacement in custom strings (including {{CSV:col:name.fn}} and {{CSV:col:name.ln}})
     let resolved = rawAnswer;
     if (resolved.includes('{{CSV:') && currentCsvRow) {
-      resolved = resolved.replace(/{{CSV:(\d+)}}/g, (_, col) => {
+      resolved = resolved.replace(/{{CSV:(\d+)(?:[:.](name\.fn|name\.ln|fn|ln|full))?}}/gi, (_, col, part) => {
         const idx = parseInt(col, 10);
-        return currentCsvRow[idx] !== undefined ? currentCsvRow[idx] : '';
+        const val = currentCsvRow[idx] !== undefined ? currentCsvRow[idx] : '';
+        let normPart = 'full';
+        if (part) {
+          const pLower = part.toLowerCase();
+          if (pLower === 'name.fn' || pLower === 'fn') normPart = 'name.fn';
+          else if (pLower === 'name.ln' || pLower === 'ln') normPart = 'name.ln';
+        }
+        return splitNameValue(val, normPart);
       });
     }
     if (resolved.includes('{{RANDOM_TEXT_15}}')) {
